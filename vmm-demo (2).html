@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VMM Complaint Follow-Up</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0a0f; --surface: #111118; --surface2: #18181f;
+    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.14);
+    --accent: #4f8ef7; --green: #22c55e; --amber: #f59e0b; --red: #ef4444;
+    --text: #f0f0f5; --muted: #6b6b80;
+    --mono: 'DM Mono', monospace; --sans: 'Syne', sans-serif;
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; overflow-x: hidden; }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(79,142,247,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(79,142,247,0.04) 1px, transparent 1px);
+    background-size: 40px 40px; pointer-events: none; z-index: 0;
+  }
+  .wrap { position: relative; z-index: 1; max-width: 980px; margin: 0 auto; padding: 48px 24px 80px; }
+  .header { margin-bottom: 36px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 11px; color: var(--accent);
+    background: rgba(79,142,247,0.1); border: 1px solid rgba(79,142,247,0.2);
+    padding: 4px 10px; border-radius: 4px; letter-spacing: 0.08em; margin-bottom: 12px;
+  }
+  .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  h1 { font-size: clamp(26px,4vw,38px); font-weight: 800; line-height: 1.1; letter-spacing: -0.02em; margin-bottom: 6px; }
+  h1 span { color: var(--accent); }
+  .subtitle { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+  /* Phone input bar */
+  .phone-bar {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface); border: 1px solid rgba(79,142,247,0.3);
+    border-radius: 10px; padding: 14px 18px; margin-bottom: 28px;
+  }
+  .phone-bar-label {
+    font-family: var(--mono); font-size: 11px; color: var(--accent);
+    text-transform: uppercase; letter-spacing: 0.1em; white-space: nowrap; flex-shrink: 0;
+  }
+  .phone-prefix {
+    font-family: var(--mono); font-size: 13px; color: var(--muted);
+    border-right: 1px solid var(--border2); padding-right: 10px; flex-shrink: 0;
+  }
+  #testPhone {
+    flex: 1; background: transparent; border: none; outline: none;
+    font-family: var(--mono); font-size: 14px; color: var(--text);
+    letter-spacing: 0.05em;
+  }
+  #testPhone::placeholder { color: var(--muted); }
+  .phone-hint { font-family: var(--mono); font-size: 10px; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+  .phone-valid { color: var(--green); }
+  .phone-invalid { color: var(--red); }
+
+  .layout { display: grid; grid-template-columns: 1fr 370px; gap: 20px; align-items: start; }
+  .section-title {
+    font-family: var(--mono); font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.12em; color: var(--muted); margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .select-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; margin-bottom: 12px;
+  }
+  .select-bar-left { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .select-bar-left input { accent-color: var(--accent); }
+  .selected-count { font-family: var(--mono); font-size: 12px; color: var(--accent); }
+  .complaints-list { display: flex; flex-direction: column; gap: 10px; }
+  .complaint-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; cursor: pointer; transition: border-color 0.2s, background 0.2s;
+    position: relative; overflow: hidden;
+  }
+  .complaint-card::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    border-radius: 3px 0 0 3px; background: var(--accent); opacity: 0; transition: opacity 0.2s;
+  }
+  .complaint-card:hover { border-color: var(--border2); background: var(--surface2); }
+  .complaint-card.selected { border-color: rgba(79,142,247,0.4); background: rgba(79,142,247,0.05); }
+  .complaint-card.selected::before { opacity: 1; }
+  .complaint-card.queued { border-color: rgba(245,158,11,0.3); }
+  .complaint-card.sent { border-color: rgba(34,197,94,0.3); opacity: 0.6; pointer-events: none; }
+  .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+  .card-id { font-family: var(--mono); font-size: 11px; color: var(--accent); }
+  .card-name { font-size: 15px; font-weight: 700; margin-top: 2px; }
+  .status-pill { font-family: var(--mono); font-size: 10px; padding: 3px 8px; border-radius: 20px; white-space: nowrap; flex-shrink: 0; }
+  .pill-open   { background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.25); }
+  .pill-sent   { background: rgba(34,197,94,0.12);  color: #22c55e; border: 1px solid rgba(34,197,94,0.2); }
+  .pill-queued { background: rgba(79,142,247,0.12); color: var(--accent); border: 1px solid rgba(79,142,247,0.2); }
+  .card-meta { display: flex; gap: 16px; flex-wrap: wrap; }
+  .meta-item { display: flex; flex-direction: column; gap: 2px; }
+  .meta-label { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .meta-value { font-family: var(--mono); font-size: 12px; color: var(--text); }
+  .meta-value.overdue { color: var(--red); }
+  .card-type { margin-top: 10px; font-size: 13px; color: var(--muted); padding-top: 10px; border-top: 1px solid var(--border); }
+  .right-panel { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 24px; }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .panel-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .panel-title { font-family: var(--mono); font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+  .panel-body { padding: 16px; }
+  .wa-bubble {
+    background: rgba(31,111,235,0.08); border: 1px solid rgba(31,111,235,0.2);
+    border-radius: 12px 12px 12px 2px; padding: 12px 14px;
+    font-size: 12px; line-height: 1.75; color: var(--text);
+    white-space: pre-wrap; font-family: var(--mono); min-height: 80px; max-height: 280px; overflow-y: auto;
+  }
+  .wa-empty { color: var(--muted); font-style: italic; }
+  .payload-box {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 12px;
+    font-family: var(--mono); font-size: 11px; line-height: 1.7; color: #a0a0b8;
+    max-height: 160px; overflow-y: auto; white-space: pre;
+  }
+  .payload-box .key { color: #7c9ef8; }
+  .payload-box .str { color: #86efac; }
+  .payload-box .num { color: #fbbf24; }
+  .fire-btn {
+    width: 100%; padding: 14px; background: var(--accent); color: #fff;
+    font-family: var(--sans); font-size: 15px; font-weight: 700; border: none;
+    border-radius: 8px; cursor: pointer; transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px; letter-spacing: -0.01em;
+  }
+  .fire-btn:hover:not(:disabled) { background: #6ba0ff; transform: translateY(-1px); }
+  .fire-btn:active:not(:disabled) { transform: translateY(0); }
+  .fire-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+  .fire-btn.loading { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+  .log-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .log-body { padding: 12px 16px; max-height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+  .log-entry { font-family: var(--mono); font-size: 11px; display: flex; gap: 10px; align-items: flex-start; animation: fadeIn 0.25s ease; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:translateY(0)} }
+  .log-time { color: var(--muted); flex-shrink: 0; }
+  .log-ok   { color: var(--green); }
+  .log-err  { color: var(--red); }
+  .log-info { color: var(--accent); }
+  .log-warn { color: var(--amber); }
+  .log-empty { color: var(--muted); font-style: italic; font-family: var(--mono); font-size: 12px; padding: 4px 0; }
+  .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.2); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  @media(max-width:720px){ .layout{grid-template-columns:1fr} .right-panel{position:static} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <div class="badge">VMM · Vishal Retail</div>
+    <h1>Complaint <span>Follow-Up</span> Demo</h1>
+    <div class="subtitle">// Select complaints → enter your number → WhatsApp sent to you for testing</div>
+  </div>
+
+  <!-- Phone number bar -->
+  <div class="phone-bar">
+    <div class="phone-bar-label">Test number</div>
+    <div class="phone-prefix">+91</div>
+    <input type="tel" id="testPhone" placeholder="98765 43210" maxlength="10" oninput="onPhoneInput(this.value)" />
+    <div class="phone-hint" id="phoneHint">Enter 10-digit mobile number</div>
+  </div>
+
+  <div class="layout">
+    <div>
+      <div class="section-title">Sample complaints — TAT breached</div>
+      <div class="select-bar">
+        <div class="select-bar-left">
+          <input type="checkbox" id="selectAll" onchange="toggleAll(this.checked)">
+          <label for="selectAll">Select all</label>
+        </div>
+        <div class="selected-count" id="selectedCount">0 selected</div>
+      </div>
+      <div class="complaints-list" id="complaintsList"></div>
+    </div>
+
+    <div class="right-panel">
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">WhatsApp message preview</span></div>
+        <div class="panel-body">
+          <div class="wa-bubble" id="waPreview"><span class="wa-empty">Select a complaint to preview</span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Payload</span></div>
+        <div class="panel-body" style="padding:12px;">
+          <div class="payload-box" id="payloadBox"><span style="color:var(--muted);font-style:italic;">Select complaints to see payload</span></div>
+        </div>
+      </div>
+
+      <button class="fire-btn" id="fireBtn" onclick="fireWebhook()" disabled>
+        Send Follow-Up Messages
+      </button>
+
+      <div class="log-panel">
+        <div class="panel-header">
+          <span class="panel-title">Activity log</span>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--muted);cursor:pointer;" onclick="clearLog()">Clear</span>
+        </div>
+        <div class="log-body" id="logBody"><div class="log-empty">No activity yet</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const WEBHOOK_URL = 'https://automation.openmindhelpline.com/webhook/followup';
+
+const complaints = [
+  { id:"VMM-2024-001", name:"Ramesh Kumar",  type:"Rodent Damage",        store:"VMM Lajpat Nagar",   raisedOn:"2024-12-10", tatDate:"2024-12-17", vendorName:"Pest Control India Pvt Ltd" },
+  { id:"VMM-2024-002", name:"Sunita Sharma", type:"Equipment Malfunction", store:"VMM Rohini",          raisedOn:"2024-12-08", tatDate:"2024-12-15", vendorName:"ColdTech Services" },
+  { id:"VMM-2024-003", name:"Ajay Verma",    type:"Electrical Fault",      store:"VMM Dwarka",          raisedOn:"2024-12-05", tatDate:"2024-12-12", vendorName:"PowerFix Solutions" },
+  { id:"VMM-2024-004", name:"Priya Mehta",   type:"Structural Damage",     store:"VMM Saket",           raisedOn:"2024-12-09", tatDate:"2024-12-16", vendorName:"BuildRight Contractors" },
+  { id:"VMM-2024-005", name:"Karan Singh",   type:"HVAC Failure",          store:"VMM Noida Sector 18", raisedOn:"2024-12-11", tatDate:"2024-12-18", vendorName:"CoolAir Systems" }
+];
+
+let selected = new Set();
+let cardStatuses = {};
+let testMobile = '';
+
+function daysOverdue(d) { return Math.floor((new Date() - new Date(d)) / 86400000); }
+
+function onPhoneInput(val) {
+  const digits = val.replace(/\D/g,'');
+  testMobile = digits.length === 10 ? '91' + digits : '';
+  const hint = document.getElementById('phoneHint');
+  if (digits.length === 0) {
+    hint.textContent = 'Enter 10-digit mobile number';
+    hint.className = 'phone-hint';
+  } else if (digits.length < 10) {
+    hint.textContent = `${10 - digits.length} more digit(s)`;
+    hint.className = 'phone-hint phone-invalid';
+  } else {
+    hint.textContent = '+91' + digits + ' · ready';
+    hint.className = 'phone-hint phone-valid';
+  }
+  updateFireBtn();
+  updatePayload();
+}
+
+function getEffectiveMobile(complaint) {
+  return testMobile || complaint.mobile || '';
+}
+
+function buildWAMessage(c) {
+  const days = daysOverdue(c.tatDate);
+  return `Hi ${c.name},
+
+This is a follow-up for your complaint #${c.id} raised at ${c.store} on ${c.raisedOn}.
+
+Complaint: ${c.type}
+Vendor: ${c.vendorName}
+TAT Deadline: ${c.tatDate} (${days} day${days!==1?'s':''} overdue)
+
+Has the vendor responded or resolved your issue?
+
+Reply:
+1 — Yes, issue is resolved
+2 — No response from vendor yet
+3 — Partially resolved, still pending
+
+Feel free to reply in your own words too — we will update your complaint accordingly.
+
+— VMM Customer Support`;
+}
+
+function buildPayload(c) {
+  return {
+    complaint_id: c.id,
+    customer_name: c.name,
+    mobile: getEffectiveMobile(c),
+    complaint_type: c.type,
+    store: c.store,
+    raised_on: c.raisedOn,
+    tat_date: c.tatDate,
+    vendor_name: c.vendorName,
+    days_overdue: daysOverdue(c.tatDate),
+    message: buildWAMessage(c)
+  };
+}
+
+function updateFireBtn() {
+  const hasSelected = selected.size > 0;
+  const hasPhone = testMobile.length > 0;
+  document.getElementById('fireBtn').disabled = !(hasSelected && hasPhone);
+}
+
+function renderCards() {
+  const list = document.getElementById('complaintsList');
+  list.innerHTML = '';
+  complaints.forEach(c => {
+    const days = daysOverdue(c.tatDate);
+    const st = cardStatuses[c.id] || 'open';
+    const isSel = selected.has(c.id);
+    const div = document.createElement('div');
+    div.className = `complaint-card${isSel?' selected':''}${st==='sent'?' sent':''}`;
+    div.onclick = () => toggleSelect(c.id);
+    const pill = st==='sent'
+      ? '<span class="status-pill pill-sent">Sent</span>'
+      : st==='queued'
+        ? '<span class="status-pill pill-queued">Sending...</span>'
+        : '<span class="status-pill pill-open">TAT Breached</span>';
+    const displayMobile = testMobile ? '91xxxxxxxxxx (test)' : 'Enter test number';
+    div.innerHTML = `
+      <div class="card-top">
+        <div><div class="card-id">${c.id}</div><div class="card-name">${c.name}</div></div>
+        ${pill}
+      </div>
+      <div class="card-meta">
+        <div class="meta-item"><div class="meta-label">Sending to</div><div class="meta-value" style="color:${testMobile?'var(--green)':'var(--amber)'}">+${testMobile || '— set number above'}</div></div>
+        <div class="meta-item"><div class="meta-label">TAT deadline</div><div class="meta-value overdue">${c.tatDate} · ${days}d over</div></div>
+        <div class="meta-item"><div class="meta-label">Store</div><div class="meta-value">${c.store}</div></div>
+      </div>
+      <div class="card-type">${c.type} · ${c.vendorName}</div>`;
+    list.appendChild(div);
+  });
+  updatePreview(); updatePayload(); updateCount(); updateFireBtn();
+}
+
+function toggleSelect(id) {
+  if (['sent','queued'].includes(cardStatuses[id])) return;
+  selected.has(id) ? selected.delete(id) : selected.add(id);
+  renderCards(); updateSelectAllState();
+}
+
+function toggleAll(checked) {
+  if (checked) complaints.forEach(c => { if (!['sent','queued'].includes(cardStatuses[c.id])) selected.add(c.id); });
+  else selected.clear();
+  renderCards();
+}
+
+function updateSelectAllState() {
+  const el = complaints.filter(c => !['sent','queued'].includes(cardStatuses[c.id]));
+  document.getElementById('selectAll').checked = el.length > 0 && el.every(c => selected.has(c.id));
+}
+
+function updateCount() { document.getElementById('selectedCount').textContent = `${selected.size} selected`; }
+
+function updatePreview() {
+  const box = document.getElementById('waPreview');
+  if (selected.size === 0) { box.innerHTML = '<span class="wa-empty">Select a complaint to preview</span>'; return; }
+  const first = complaints.find(c => selected.has(c.id));
+  if (first) {
+    box.textContent = buildWAMessage(first);
+    if (selected.size > 1) {
+      const note = document.createElement('div');
+      note.style.cssText = 'margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.08);font-size:10px;color:var(--muted);';
+      note.textContent = `+ ${selected.size-1} more message(s) queued`;
+      box.appendChild(note);
+    }
+  }
+}
+
+function updatePayload() {
+  const box = document.getElementById('payloadBox');
+  if (selected.size === 0) { box.innerHTML = '<span style="color:var(--muted);font-style:italic;">Select complaints to see payload</span>'; return; }
+  const data = complaints.filter(c => selected.has(c.id)).map(buildPayload);
+  box.innerHTML = syntaxHighlight(JSON.stringify(data, null, 2));
+}
+
+function syntaxHighlight(json) {
+  return json
+    .replace(/("[\w_]+")\s*:/g, '<span class="key">$1</span>:')
+    .replace(/:\s*("((?:[^"\\]|\\.)*)")/g, ': <span class="str">"$2"</span>')
+    .replace(/:\s*(\d+)(\s*[,\n\]])/g, ': <span class="num">$1</span>$2');
+}
+
+function addLog(msg, type='info') {
+  const body = document.getElementById('logBody');
+  const empty = body.querySelector('.log-empty');
+  if (empty) empty.remove();
+  const time = new Date().toTimeString().slice(0,8);
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+  div.innerHTML = `<span class="log-time">${time}</span><span class="log-${type}">${msg}</span>`;
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+}
+
+function clearLog() { document.getElementById('logBody').innerHTML = '<div class="log-empty">No activity yet</div>'; }
+
+async function fireWebhook() {
+  if (selected.size === 0 || !testMobile) return;
+  const items = complaints.filter(c => selected.has(c.id)).map(buildPayload);
+  const btn = document.getElementById('fireBtn');
+  btn.disabled = true; btn.classList.add('loading');
+  btn.innerHTML = '<span class="spin"></span> Sending...';
+  addLog(`Sending ${items.length} follow-up(s) to +${testMobile}...`, 'info');
+  items.forEach(p => { cardStatuses[p.complaint_id] = 'queued'; });
+  renderCards();
+  let ok=0, fail=0;
+  for (const item of items) {
+    try {
+      addLog(`→ ${item.complaint_id} · ${item.customer_name} → +${item.mobile}`, 'info');
+      const res = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(item)
+      });
+      if (res.ok) {
+        addLog(`✓ ${item.complaint_id} — triggered successfully`, 'ok');
+        cardStatuses[item.complaint_id] = 'sent';
+        selected.delete(item.complaint_id); ok++;
+      } else {
+        addLog(`✗ ${item.complaint_id} — server error ${res.status}`, 'err');
+        cardStatuses[item.complaint_id] = 'open'; fail++;
+      }
+    } catch(e) {
+      addLog(`✗ ${item.complaint_id} — ${e.message}`, 'err');
+      cardStatuses[item.complaint_id] = 'open'; fail++;
+    }
+    renderCards();
+    await new Promise(r => setTimeout(r, 500));
+  }
+  addLog(`Done — ${ok} sent${fail>0?`, ${fail} failed`:''}`, ok>0?'ok':'err');
+  btn.classList.remove('loading');
+  btn.innerHTML = 'Send Follow-Up Messages';
+  updateFireBtn();
+  updateSelectAllState();
+}
+
+renderCards();
+</script>
+</body>
+</html>
